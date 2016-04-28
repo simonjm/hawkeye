@@ -70,7 +70,7 @@ func watchDirectory(watchDir string, pathChan chan string) {
 		logger.Fatal(err)
 	}
 
-	err = watcher.AddWatch(watchDir, inotify.IN_CREATE|inotify.IN_MOVED_TO)
+	err = watcher.AddWatch(watchDir, inotify.IN_CLOSE_WRITE|inotify.IN_MOVED_TO)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -115,6 +115,7 @@ func convertFiles(videosChan <-chan string) {
 
 		if err := os.Remove(video); err != nil {
 			logger.Println(err)
+			continue
 		}
 
 		logger.Printf("Finished %s\n", output)
