@@ -107,7 +107,7 @@ func convertFiles(videosChan <-chan string) {
 		mp4File := strings.Replace(video, ".mkv", ".mp4", 1)
 		output := filepath.Join(*outDir, filepath.Base(mp4File))
 		logger.Printf("Converting %s to %s\n", video, output)
-		cmd := exec.Command("/usr/bin/ffmpeg", "-i", video, "-c:v", "copy", "-c:a", "copy", output)
+		cmd := exec.Command("/usr/bin/ffmpeg", "-i", video, "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", output)
 		if err := cmd.Run(); err != nil {
 			logger.Println(err)
 			continue
