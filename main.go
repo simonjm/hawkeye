@@ -79,7 +79,7 @@ func watchDirectory(watchDir string, pathChan chan string) {
 		logger.Fatal(err)
 	}
 
-	logger.Printf("Started watching for mkv files at %s\n", *outDir)
+	logger.Printf("Started watching for mkv files at %s\n", watchDir)
 
 	for {
 		select {
@@ -124,7 +124,7 @@ func convertFiles(videosChan <-chan string) {
 			commandArgs = append(commandArgs, "copy", output)
 		}
 
-		logger.Printf("Running ffmpeg with arguments %v", commandArgs)
+		logger.Printf("Running ffmpeg with arguments %v\n", commandArgs)
 		if _, err := runCommandWithErrorMsg("/usr/bin/ffmpeg", commandArgs...); err != nil {
 			logger.Println(err)
 			continue
