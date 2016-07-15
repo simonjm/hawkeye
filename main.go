@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -33,16 +34,19 @@ func main() {
 		log.Fatal("--out-dir is required")
 	}
 
+	var logWriter io.Writer
 	if *logFile == "" {
-		log.Fatal("--log-file is required")
+		logWriter = os.Stdout
+	} else {
+		logFile, err := os.OpenFile(*logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer logFile.Close()
+		logWriter = logFile
 	}
 
-	logFile, err := os.OpenFile(*logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer logFile.Close()
-	logger = log.New(logFile, "", log.Ldate|log.Ltime|log.Lshortfile)
+	logger = log.New(logWriter, "", log.Ldate|log.Ltime|log.Lshortfile)
 
 	pathChan := make(chan string)
 	go processFiles(pathChan)
