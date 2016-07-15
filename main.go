@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -125,7 +123,7 @@ func convertFiles(videosChan <-chan string) {
 		}
 
 		logger.Printf("Running ffmpeg with arguments %v\n", commandArgs)
-		if _, err := runCommandWithErrorMsg("/usr/bin/ffmpeg", commandArgs...); err != nil {
+		if err := exec.Command("/usr/bin/ffmpeg", commandArgs...).Run(); err != nil {
 			logger.Println(err)
 			continue
 		}
@@ -139,43 +137,10 @@ func convertFiles(videosChan <-chan string) {
 	}
 }
 
-// Runs the command and returns the stdout or an error with stderr as the message
-func runCommandWithErrorMsg(command string, args ...string) (string, error) {
-	cmd := exec.Command(command, args...)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return "", err
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return "", err
-	}
-
-	if err := cmd.Start(); err != nil {
-		return "", err
-	}
-
-	outBuf := bytes.Buffer{}
-	if _, err := io.Copy(&outBuf, stdout); err != nil {
-		return "", err
-	}
-
-	errBuf := bytes.Buffer{}
-	if _, err := io.Copy(&errBuf, stderr); err != nil {
-		return "", err
-	}
-
-	if err := cmd.Wait(); err != nil {
-		return "", fmt.Errorf("%s. Stderr - %s", err, errBuf.String())
-	}
-
-	return outBuf.String(), nil
-}
-
 // Checks if video needs the audio converted to AAC
 func shouldConvertAudio(filename string) (bool, error) {
 	probeCommand := fmt.Sprintf("ffprobe -v error -show_format -show_streams \"%s\" | grep codec_name", filename)
-	output, err := runCommandWithErrorMsg("/bin/sh", "-c", probeCommand)
+	output, err := exec.Command("/bin/sh", "-c", probeCommand).Output()
 	if err != nil {
 		return false, err
 	}
