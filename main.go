@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"strings"
 
-	"golang.org/x/exp/inotify"
+	"github.com/fsnotify/fsnotify"
 )
 
 var (
@@ -32,6 +32,10 @@ func main() {
 
 	if *outDir == "" {
 		log.Fatal("--out-dir is required")
+	}
+
+	if err := os.MkdirAll(*outDir, 0755); err != nil {
+		log.Fatal(err)
 	}
 
 	var logWriter io.Writer
@@ -71,12 +75,12 @@ func findInitialFiles(watchDir string, pathChan chan string) {
 }
 
 func watchDirectory(watchDir string, pathChan chan string) {
-	watcher, err := inotify.NewWatcher()
+	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		logger.Fatal(err)
 	}
 
-	err = watcher.AddWatch(watchDir, inotify.IN_CLOSE_WRITE|inotify.IN_MOVED_TO)
+	err = watcher.Add(watchDir)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -85,9 +89,11 @@ func watchDirectory(watchDir string, pathChan chan string) {
 
 	for {
 		select {
-		case ev := <-watcher.Event:
-			pathChan <- ev.Name
-		case err := <-watcher.Error:
+		case ev := <-watcher.Events:
+			if ev.Op == fsnotify.Create {
+				pathChan <- ev.Name
+			}
+		case err := <-watcher.Errors:
 			logger.Println(err)
 		}
 	}

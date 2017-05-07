@@ -1,1 +1,3 @@
 hawkeye
+vendor/*
+!vendor/vendor.json
