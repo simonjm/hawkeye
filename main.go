@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -149,23 +150,37 @@ func convertFiles(videosChan <-chan string) {
 
 // Checks if video needs the audio converted to AAC
 func shouldConvertAudio(filename string) (bool, error) {
-	probeCommand := fmt.Sprintf("ffprobe -v error -show_format -show_streams \"%s\" | grep codec_name", filename)
-	output, err := exec.Command("/bin/sh", "-c", probeCommand).Output()
+	codecs, err := getCodecs(filename)
 	if err != nil {
 		return false, err
 	}
 
-	lines := strings.Split(string(output), "\n")
-	for _, l := range lines {
-		matched, err := regexp.Match("codec_name=aac", []byte(l))
-		if err != nil {
-			return false, err
-		}
-
-		if matched {
+	for _, c := range codecs {
+		if c == "aac" {
 			return false, nil
 		}
 	}
 
 	return true, nil
+}
+
+func getCodecs(filename string) ([]string, error) {
+	probeCommand := fmt.Sprintf("ffprobe -v error -show_format -show_streams \"%s\" | grep codec_name", filename)
+	output, err := exec.Command("/bin/sh", "-c", probeCommand).Output()
+	if err != nil {
+		return nil, err
+	}
+
+	codecs := make([]string, 0, 2)
+	lines := strings.Split(string(output), "\n")
+	regex := regexp.MustCompile("codec_name=(.+)")
+	for _, l := range lines {
+		matches := regex.FindAllStringSubmatch(l, -1)
+		if len(matches) != 2 {
+			return nil, errors.New("Could not parse codecs")
+		}
+		codecs = append(codecs, strings.TrimSpace(matches[0][1]))
+	}
+
+	return codecs, nil
 }
