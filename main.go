@@ -54,14 +54,17 @@ func main() {
 
 	logger = log.New(logWriter, "", log.Ldate|log.Ltime|log.Lshortfile)
 
-	pathChan := make(chan string)
-	go processFiles(pathChan)
+	// set up ffmpeg worker goroutines
+	videosChan := make(chan string, *maxJobs)
+	for i := 0; i < *maxJobs; i++ {
+		logger.Printf("Worker %d has started\n", i+1)
+		go convertFiles(videosChan)
+	}
 
-	findInitialFiles(watchDir, pathChan)
-	watchDirectory(watchDir, pathChan)
+	watchDirectory(watchDir, videosChan)
 }
 
-func findInitialFiles(watchDir string, pathChan chan string) {
+func findInitialFiles(watchDir string, pathChan chan<- string) {
 	searchPattern := filepath.Join(watchDir, "*.mkv")
 	logger.Printf("Checking %s for initial files with pattern '%s'\n", watchDir, searchPattern)
 
@@ -72,11 +75,15 @@ func findInitialFiles(watchDir string, pathChan chan string) {
 	}
 
 	for _, m := range matches {
+		logger.Printf("Queuing %s\n", m)
 		pathChan <- m
 	}
 }
 
-func watchDirectory(watchDir string, pathChan chan string) {
+// Starts watching a directory for new .mkv files and writes the path to the channel
+func watchDirectory(watchDir string, pathChan chan<- string) {
+	go findInitialFiles(watchDir, pathChan)
+
 	watcher, err := inotify.NewWatcher()
 	if err != nil {
 		logger.Fatal(err)
@@ -92,6 +99,10 @@ func watchDirectory(watchDir string, pathChan chan string) {
 	for {
 		select {
 		case ev := <-watcher.Events:
+			if filepath.Ext(ev.Name) != ".mkv" {
+				continue
+			}
+			logger.Printf("Queuing %s\n", ev.Name)
 			pathChan <- ev.Name
 		case err := <-watcher.Errors:
 			logger.Println(err)
@@ -99,23 +110,14 @@ func watchDirectory(watchDir string, pathChan chan string) {
 	}
 }
 
-func processFiles(pathChan <-chan string) {
-	videosChan := make(chan string, *maxJobs)
-	for i := 0; i < *maxJobs; i++ {
-		logger.Printf("Worker %d has started\n", i+1)
-		go convertFiles(videosChan)
-	}
-
-	for p := range pathChan {
-		if filepath.Ext(p) == ".mkv" {
-			logger.Printf("Queuing %s\n", p)
-			videosChan <- p
-		}
-	}
-}
-
+// Convert video files that come in through the channel. Runs in separate goroutine
 func convertFiles(videosChan <-chan string) {
 	for video := range videosChan {
+		// extra check to make sure we only get .mkv files to convert
+		if filepath.Ext(video) != ".mkv" {
+			continue
+		}
+
 		mp4File := strings.Replace(video, ".mkv", ".mp4", 1)
 		output := filepath.Join(*outDir, filepath.Base(mp4File))
 
@@ -132,7 +134,7 @@ func convertFiles(videosChan <-chan string) {
 			continue
 		}
 
-		// check if we need to convert the audio
+		// check if we need to convert the audio and append the correct args
 		if !hasCodec("aac", codecs) {
 			commandArgs = append(commandArgs, "aac", "-b:a", "192k", output)
 		} else {
@@ -159,11 +161,11 @@ func convertFiles(videosChan <-chan string) {
 func hasCodec(codec string, codecs []string) bool {
 	for _, c := range codecs {
 		if c == codec {
-			return false
+			return true
 		}
 	}
 
-	return true
+	return false
 }
 
 // Gets a lit of codecs that are used by the video file

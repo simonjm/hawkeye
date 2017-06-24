@@ -7,6 +7,11 @@ build:
 run: build
 	docker run --rm --name hawkeye --init -v $(shell pwd)/in:/in $(IMAGE)
 
+deploy:
+	GOOS=linux GOARCH=arm GOARM=7 go build
+	scp hawkeye joe@192.168.11.16:/home/joe/bin
+	rm -f hawkeye
+
 clean:
 	rm -f hawkeye
 
