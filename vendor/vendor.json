@@ -4,11 +4,10 @@
 	"package": [
 		{
 			"checksumSHA1": "oS0UZOGWVVsVciOQ8nZJ582mFF8=",
-			"origin": "github.com/fsnotify/fsnotify/vendor/golang.org/x/sys/unix",
 			"path": "golang.org/x/sys/unix",
-			"revision": "4da3e2cfbabc9f751898f250b49f2439785783a1",
-			"revisionTime": "2017-03-29T04:21:07Z"
+			"revision": "9ccfe848b9db8435a24c424abbc07a921adf1df5",
+			"revisionTime": "2017-04-27T03:54:25Z"
 		}
 	],
-	"rootPath": "simongeeks.com/joe/hawkeye"
+	"rootPath": "github.com/simonjm/hawkeye"
 }
