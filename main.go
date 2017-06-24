@@ -12,8 +12,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/simonjm/hawkeye/inotify"
 	"golang.org/x/sys/unix"
-	"simongeeks.com/joe/hawkeye/inotify"
 )
 
 var (
