@@ -12,7 +12,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/fsnotify/fsnotify"
+	"golang.org/x/sys/unix"
+	"simongeeks.com/joe/hawkeye/inotify"
 )
 
 var (
@@ -76,12 +77,12 @@ func findInitialFiles(watchDir string, pathChan chan string) {
 }
 
 func watchDirectory(watchDir string, pathChan chan string) {
-	watcher, err := fsnotify.NewWatcher()
+	watcher, err := inotify.NewWatcher()
 	if err != nil {
 		logger.Fatal(err)
 	}
 
-	err = watcher.Add(watchDir)
+	err = watcher.Add(watchDir, unix.IN_CLOSE_WRITE|unix.IN_MOVED_TO)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -91,9 +92,7 @@ func watchDirectory(watchDir string, pathChan chan string) {
 	for {
 		select {
 		case ev := <-watcher.Events:
-			if ev.Op == fsnotify.Create {
-				pathChan <- ev.Name
-			}
+			pathChan <- ev.Name
 		case err := <-watcher.Errors:
 			logger.Println(err)
 		}
@@ -121,13 +120,20 @@ func convertFiles(videosChan <-chan string) {
 		output := filepath.Join(*outDir, filepath.Base(mp4File))
 
 		commandArgs := []string{"-y", "-i", video, "-c:v", "copy", "-c:a"}
-		shouldConvert, err := shouldConvertAudio(video)
+		codecs, err := getCodecs(video)
 		if err != nil {
 			logger.Println(err)
 			continue
 		}
 
-		if shouldConvert {
+		// h264 videos are supported and its too slow to convert videos to that on a raspberry pi
+		if !hasCodec("h264", codecs) {
+			logger.Printf("Codec not supported %s\n", video)
+			continue
+		}
+
+		// check if we need to convert the audio
+		if !hasCodec("aac", codecs) {
 			commandArgs = append(commandArgs, "aac", "-b:a", "192k", output)
 		} else {
 			commandArgs = append(commandArgs, "copy", output)
@@ -139,6 +145,7 @@ func convertFiles(videosChan <-chan string) {
 			continue
 		}
 
+		// delete the old video
 		if err := os.Remove(video); err != nil {
 			logger.Println(err)
 			continue
@@ -148,22 +155,18 @@ func convertFiles(videosChan <-chan string) {
 	}
 }
 
-// Checks if video needs the audio converted to AAC
-func shouldConvertAudio(filename string) (bool, error) {
-	codecs, err := getCodecs(filename)
-	if err != nil {
-		return false, err
-	}
-
+// Checks if a specific codec is in the list
+func hasCodec(codec string, codecs []string) bool {
 	for _, c := range codecs {
-		if c == "aac" {
-			return false, nil
+		if c == codec {
+			return false
 		}
 	}
 
-	return true, nil
+	return true
 }
 
+// Gets a lit of codecs that are used by the video file
 func getCodecs(filename string) ([]string, error) {
 	probeCommand := fmt.Sprintf("ffprobe -v error -show_format -show_streams \"%s\" | grep codec_name", filename)
 	output, err := exec.Command("/bin/sh", "-c", probeCommand).Output()
@@ -172,11 +175,11 @@ func getCodecs(filename string) ([]string, error) {
 	}
 
 	codecs := make([]string, 0, 2)
-	lines := strings.Split(string(output), "\n")
-	regex := regexp.MustCompile("codec_name=(.+)")
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	regex := regexp.MustCompile("codec_name=(.+)$")
 	for _, l := range lines {
 		matches := regex.FindAllStringSubmatch(l, -1)
-		if len(matches) != 2 {
+		if matches == nil {
 			return nil, errors.New("Could not parse codecs")
 		}
 		codecs = append(codecs, strings.TrimSpace(matches[0][1]))
