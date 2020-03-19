@@ -9,7 +9,7 @@ run: build
 
 deploy:
 	GOOS=linux GOARCH=arm GOARM=7 go build
-	scp hawkeye joe@192.168.11.16:/home/joe/bin
+	scp hawkeye joe@192.168.0.54:/home/joe/bin
 	rm -f hawkeye
 
 clean:

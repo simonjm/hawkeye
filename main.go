@@ -24,6 +24,8 @@ var (
 
 var logger *log.Logger
 
+var allowedFileTypes = []string{".mkv", ".m4v"}
+
 func main() {
 	flag.Parse()
 
@@ -65,18 +67,20 @@ func main() {
 }
 
 func findInitialFiles(watchDir string, pathChan chan<- string) {
-	searchPattern := filepath.Join(watchDir, "*.mkv")
-	logger.Printf("Checking %s for initial files with pattern '%s'\n", watchDir, searchPattern)
+	logger.Printf("Checking %s for initial %v files \n", watchDir, allowedFileTypes)
 
-	matches, err := filepath.Glob(searchPattern)
-	if err != nil {
-		logger.Println(err)
-		return
-	}
+	for _, ext := range allowedFileTypes {
+		searchPattern := filepath.Join(watchDir, fmt.Sprintf("*%s", ext))
+		files, err := filepath.Glob(searchPattern)
+		if err != nil {
+			logger.Println(err)
+			continue
+		}
 
-	for _, m := range matches {
-		logger.Printf("Queuing %s\n", m)
-		pathChan <- m
+		for _, f := range files {
+			logger.Printf("Queuing %s\n", f)
+			pathChan <- f
+		}
 	}
 }
 
@@ -94,12 +98,12 @@ func watchDirectory(watchDir string, pathChan chan<- string) {
 		logger.Fatal(err)
 	}
 
-	logger.Printf("Started watching for mkv files at %s\n", watchDir)
+	logger.Printf("Started watching for video files at %s\n", watchDir)
 
 	for {
 		select {
 		case ev := <-watcher.Events:
-			if filepath.Ext(ev.Name) != ".mkv" {
+			if !isAllowedFile(ev.Name) {
 				continue
 			}
 			logger.Printf("Queuing %s\n", ev.Name)
@@ -114,11 +118,11 @@ func watchDirectory(watchDir string, pathChan chan<- string) {
 func convertFiles(videosChan <-chan string) {
 	for video := range videosChan {
 		// extra check to make sure we only get .mkv files to convert
-		if filepath.Ext(video) != ".mkv" {
+		if !isAllowedFile(video) {
 			continue
 		}
 
-		mp4File := strings.Replace(video, ".mkv", ".mp4", 1)
+		mp4File := strings.Replace(video, filepath.Ext(video), ".mp4", 1)
 		output := filepath.Join(*outDir, filepath.Base(mp4File))
 
 		commandArgs := []string{"-y", "-i", video, "-c:v", "copy", "-c:a"}
@@ -188,4 +192,13 @@ func getCodecs(filename string) ([]string, error) {
 	}
 
 	return codecs, nil
+}
+
+func isAllowedFile(filename string) bool {
+	for _, ext := range allowedFileTypes {
+		if filepath.Ext(filename) == ext {
+			return true
+		}
+	}
+	return false
 }
