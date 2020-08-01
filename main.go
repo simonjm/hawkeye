@@ -57,7 +57,7 @@ func main() {
 	logger = log.New(logWriter, "", log.Ldate|log.Ltime|log.Lshortfile)
 
 	// set up ffmpeg worker goroutines
-	videosChan := make(chan string, *maxJobs)
+	videosChan := make(chan string, 10000)
 	for i := 0; i < *maxJobs; i++ {
 		logger.Printf("Worker %d has started\n", i+1)
 		go convertFiles(videosChan)
