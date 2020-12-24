@@ -146,7 +146,7 @@ func convertFiles(videosChan <-chan string) {
 		}
 
 		logger.Printf("Running ffmpeg with arguments %v\n", commandArgs)
-		if err := exec.Command("/usr/bin/ffmpeg", commandArgs...).Run(); err != nil {
+		if err := exec.Command("ffmpeg", commandArgs...).Run(); err != nil {
 			logger.Println(err)
 			continue
 		}
@@ -172,7 +172,7 @@ func hasCodec(codec string, codecs []string) bool {
 	return false
 }
 
-// Gets a lit of codecs that are used by the video file
+// Gets a list of codecs that are used by the video file
 func getCodecs(filename string) ([]string, error) {
 	probeCommand := fmt.Sprintf("ffprobe -v error -show_format -show_streams \"%s\" | grep codec_name", filename)
 	output, err := exec.Command("/bin/sh", "-c", probeCommand).Output()
